@@ -72,17 +72,25 @@ This is a tutorial project of [Pocket Flow](https://github.com/The-Pocket/Pocket
 
 ## 🚀 Getting Started
 
+### Option 1: Use with Claude Desktop (Recommended for non-developers)
+
+The easiest way to use this tool is through Claude Desktop with our MCP (Model Context Protocol) server. Just chat with Claude to generate tutorials!
+
+➡️ **[See MCP Setup Guide](./MCP/README.md)** - 3 simple steps to get started
+
+### Option 2: Command Line Usage
+
 1. Clone this repository
    ```bash
    git clone https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge
    ```
 
-3. Install dependencies:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Configure your preferred LLM provider in `.env` file by copying `env.example`:
+3. Configure your preferred LLM provider in `.env` file by copying `env.example`:
    ```bash
    cp env.example .env
    ```
@@ -106,7 +114,7 @@ This is a tutorial project of [Pocket Flow](https://github.com/The-Pocket/Pocket
    python test_llm_providers.py openai
    ```
 
-5. Generate a complete codebase tutorial by running the main script:
+4. Generate a complete codebase tutorial by running the main script:
     ```bash
     # Analyze a GitHub repository
     python main.py --repo https://github.com/username/repo --include "*.py" "*.js" --exclude "tests/*" --max-size 50000

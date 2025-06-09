@@ -1,0 +1,19 @@
+name = "tutorial-codebase-knowledge"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+account_id = "b3c6ec0983b1f4ec0105f59a58587908"
+
+[vars]
+# Add your environment variables here
+# OPENAI_API_KEY = "your-key-here"
+
+[[kv_namespaces]]
+binding = "TUTORIAL_KV"
+id = "5ef31666f4bd423a816f470e18b50450"
+preview_id = "1fd819c67cfa40998fcc7cf057926fd5"
+
+[env.production]
+name = "tutorial-codebase-knowledge"
+
+[build]
+command = "npm install && npm run build"

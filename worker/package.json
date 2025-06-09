@@ -1,0 +1,21 @@
+{
+  "name": "tutorial-codebase-knowledge-worker",
+  "version": "1.0.0",
+  "description": "MCP server for generating codebase tutorials on Cloudflare Workers",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "keywords": ["mcp", "cloudflare-workers", "tutorial", "documentation"],
+  "author": "Jon Bennett",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240117.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {}
+}

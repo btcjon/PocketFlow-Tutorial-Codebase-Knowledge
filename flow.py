@@ -7,6 +7,7 @@ from nodes import (
     OrderChapters,
     WriteChapters,
     CombineTutorial,
+    MergeToSingleFile,
     MoveToDocs
 )
 
@@ -20,6 +21,7 @@ def create_tutorial_flow():
     order_chapters = OrderChapters(max_retries=5, wait=20)
     write_chapters = WriteChapters(max_retries=5, wait=20) # This is a BatchNode
     combine_tutorial = CombineTutorial()
+    merge_to_single_file = MergeToSingleFile()
     move_to_docs = MoveToDocs()
 
     # Connect nodes in sequence based on the design
@@ -28,7 +30,8 @@ def create_tutorial_flow():
     analyze_relationships >> order_chapters
     order_chapters >> write_chapters
     write_chapters >> combine_tutorial
-    combine_tutorial >> move_to_docs
+    combine_tutorial >> merge_to_single_file
+    merge_to_single_file >> move_to_docs
 
     # Create the flow starting with FetchRepo
     tutorial_flow = Flow(start=fetch_repo)

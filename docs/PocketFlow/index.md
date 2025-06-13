@@ -1,55 +1,48 @@
+---
+layout: default
+title: "PocketFlow"
+nav_order: 18
+has_children: true
+---
+
 # Tutorial: PocketFlow
 
-PocketFlow is a framework for building **multi-step workflows**. It uses self-contained *Nodes* to perform individual tasks, which are connected together into sequences or networks by a *Flow*. Data is passed and shared between Nodes using a central *Shared Store*. The path the Flow takes is determined by *Actions* returned by Nodes. PocketFlow provides specific ways to handle collections of items efficiently through *Batch Processing*, manage tasks that wait via *Asynchronous Processing* using async/await, and speed up batch tasks by running items concurrently with *Parallel Processing*.
+> This tutorial is AI-generated! To learn more, check out [AI Codebase Knowledge Builder](https://github.com/The-Pocket/Tutorial-Codebase-Knowledge)
 
-
-**Source Repository:** [https://github.com/The-Pocket/PocketFlow.git](https://github.com/The-Pocket/PocketFlow.git)
+PocketFlow<sup>[View Repo](https://github.com/The-Pocket/PocketFlow)</sup> is a *Python framework* for building modular workflows and AI agents.
+It allows you to define complex processes by connecting individual **Nodes**, which represent *atomic tasks* like calling an LLM or searching the web.
+A **Flow** then *orchestrates* these Nodes, guiding the execution sequence based on **Actions** (string identifiers) returned by each Node.
+Data is passed between Nodes and managed throughout the workflow execution via a **Shared State** (a Python dictionary).
+PocketFlow also offers advanced features like **Batch Processing** for efficiently handling collections of items, and **Asynchronous Processing** for non-blocking operations crucial for I/O-bound tasks.
+Additionally, it demonstrates an **A2A (Agent-to-Agent) Communication Framework** to wrap PocketFlow agents, enabling them to communicate with other systems using a standardized JSON-RPC protocol.
 
 ```mermaid
 flowchart TD
-    A0["Node
+    A0["Node (<code>BaseNode</code>, <code>Node</code>, <code>AsyncNode</code>)
 "]
-    A1["Flow
+    A1["Flow (<code>Flow</code>, <code>AsyncFlow</code>)
 "]
-    A2["Shared Store
+    A2["Shared State (<code>shared</code> dictionary)
 "]
-    A3["Actions
+    A3["Actions / Transitions
 "]
-    A4["Batch Processing
+    A4["Batch Processing (<code>BatchNode</code>, <code>BatchFlow</code>, <code>AsyncParallelBatchNode</code>)
 "]
-    A5["Asynchronous Processing
+    A5["Asynchronous Processing (<code>AsyncNode</code>, <code>AsyncFlow</code>)
 "]
-    A6["Parallel Processing
+    A6["A2A (Agent-to-Agent) Communication Framework
 "]
-    A0 -- "Uses" --> A2
-    A0 -- "Outputs" --> A3
-    A1 -- "Orchestrates" --> A0
-    A1 -- "Follows" --> A3
-    A4 -- "Applies to Node" --> A0
-    A4 -- "Applies to Flow" --> A1
-    A5 -- "Applies to Node" --> A0
-    A5 -- "Applies to Flow" --> A1
-    A6 -- "Based on Async" --> A5
-    A6 -- "Operates on Batches" --> A4
+    A1 -- "Orchestrates Nodes" --> A0
+    A0 -- "Accesses Shared State" --> A2
+    A0 -- "Returns Action" --> A3
+    A1 -- "Uses Action for dispatch" --> A3
+    A4 -- "Specializes Node (batch)" --> A0
+    A4 -- "Specializes Flow (batch)" --> A1
+    A5 -- "Specializes Node (async)" --> A0
+    A5 -- "Specializes Flow (async)" --> A1
+    A6 -- "Executes Flow" --> A1
+    A6 -- "Initializes Shared State" --> A2
 ```
-
-## Chapters
-
-1. [Shared Store
-](01_shared_store_.md)
-2. [Node
-](02_node_.md)
-3. [Actions
-](03_actions_.md)
-4. [Flow
-](04_flow_.md)
-5. [Batch Processing
-](05_batch_processing_.md)
-6. [Asynchronous Processing
-](06_asynchronous_processing_.md)
-7. [Parallel Processing
-](07_parallel_processing_.md)
-
 
 ---
 

@@ -16,7 +16,7 @@ log_file = os.path.join(
 logger = logging.getLogger("llm_logger")
 logger.setLevel(logging.INFO)
 logger.propagate = False  # Prevent propagation to root logger
-file_handler = logging.FileHandler(log_file)
+file_handler = logging.FileHandler(log_file, encoding='utf-8')
 file_handler.setFormatter(
     logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 )
@@ -45,185 +45,141 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
     provider = os.getenv("LLM_PROVIDER", "gemini").lower()
     
     # Call the appropriate LLM based on provider
-    if provider == "gemini":
-        response_text = _call_gemini(prompt)
-    elif provider == "anthropic":
-        response_text = _call_anthropic(prompt)
-    elif provider == "openai":
-        response_text = _call_openai(prompt)
-    elif provider == "openrouter":
-        response_text = _call_openrouter(prompt)
-    else:
-        # Default to Gemini if provider is unknown
-        logger.warning(f"Unknown LLM provider: {provider}. Falling back to Gemini.")
-        response_text = _call_gemini(prompt)
-
-    # Log the response
-    logger.info(f"RESPONSE: {response_text}")
-
-    # Update cache if enabled
-    if use_cache:
-        _update_cache(prompt, response_text)
-
-    return response_text
-
-
-def _check_cache(prompt: str) -> str:
-    """Check if a response is cached for the given prompt."""
     try:
-        if os.path.exists(cache_file):
-            with open(cache_file, "r") as f:
-                cache = json.load(f)
-                if prompt in cache:
-                    logger.info(f"CACHE HIT: Using cached response")
-                    return cache[prompt]
+        if provider == "gemini":
+            response = _call_gemini(prompt)
+        elif provider == "openai":
+            response = _call_openai(prompt)
+        elif provider == "anthropic":
+            response = _call_anthropic(prompt)
+        elif provider == "openrouter":
+            response = _call_openrouter(prompt)
+        else:
+            # Default to Gemini if unknown provider
+            logger.warning(f"Unknown LLM provider: {provider}. Falling back to Gemini.")
+            response = _call_gemini(prompt)
+        
+        # Cache the response if caching is enabled
+        if use_cache:
+            _save_to_cache(prompt, response)
+        
+        # Log the response
+        logger.info(f"RESPONSE: {response}")
+        
+        return response
+        
     except Exception as e:
-        logger.warning(f"Failed to load cache: {e}")
-    
-    return None
-
-
-def _update_cache(prompt: str, response: str) -> None:
-    """Update the cache with a new prompt-response pair."""
-    try:
-        # Load existing cache if available
-        cache = {}
-        if os.path.exists(cache_file):
-            try:
-                with open(cache_file, "r") as f:
-                    cache = json.load(f)
-            except:
-                pass
-
-        # Add to cache and save
-        cache[prompt] = response
-        with open(cache_file, "w") as f:
-            json.dump(cache, f)
-    except Exception as e:
-        logger.error(f"Failed to save cache: {e}")
+        logger.error(f"Error calling LLM: {e}")
+        raise
 
 
 def _call_gemini(prompt: str) -> str:
-    """Call the Google Gemini API."""
-    try:
-        # Use AI Studio key
-        api_key = os.getenv("GEMINI_API_KEY", "")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in environment")
-            
-        client = genai.Client(api_key=api_key)
-        model = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
-        
-        response = client.models.generate_content(model=model, contents=[prompt])
-        return response.text
-    except Exception as e:
-        error_msg = f"Gemini API call failed: {e}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
-
-
-def _call_anthropic(prompt: str) -> str:
-    """Call the Anthropic Claude API."""
-    try:
-        from anthropic import Anthropic
-        
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found in environment")
-            
-        client = Anthropic(api_key=api_key)
-        model = os.getenv("ANTHROPIC_MODEL", "claude-3-opus-20240229")
-        
-        response = client.messages.create(
-            model=model,
-            max_tokens=21000,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return response.content[0].text
-    except Exception as e:
-        error_msg = f"Anthropic API call failed: {e}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
+    """Call Google Gemini API"""
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY")))
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-exp", contents=prompt
+    )
+    return response.text
 
 
 def _call_openai(prompt: str) -> str:
-    """Call the OpenAI API."""
-    try:
-        from openai import OpenAI
-        
-        api_key = os.getenv("OPENAI_API_KEY", "")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment")
-            
-        client = OpenAI(api_key=api_key)
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
-        
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        error_msg = f"OpenAI API call failed: {e}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
+    """Call OpenAI API"""
+    from openai import OpenAI
+    
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+
+def _call_anthropic(prompt: str) -> str:
+    """Call Anthropic Claude API"""
+    import anthropic
+    
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    response = client.messages.create(
+        model="claude-3-haiku-20240307",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text
 
 
 def _call_openrouter(prompt: str) -> str:
-    """Call the OpenRouter API, which provides access to various LLMs."""
+    """Call OpenRouter API"""
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not found in environment variables")
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-thinking-exp:free"),
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
+    }
+    
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json=data
+    )
+    
+    if response.status_code != 200:
+        raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
+    
+    return response.json()["choices"][0]["message"]["content"]
+
+
+def _check_cache(prompt: str) -> str:
+    """Check if response exists in cache"""
     try:
-        api_key = os.getenv("OPENROUTER_API_KEY", "")
-        if not api_key:
-            raise ValueError("OPENROUTER_API_KEY not found in environment")
-            
-        model = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-opus:beta")
-        
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-        }
-
-        data = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}]
-        }
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=data
-        )
-
-        if response.status_code != 200:
-            error_msg = f"OpenRouter API call failed with status {response.status_code}: {response.text}"
-            logger.error(error_msg)
-            raise Exception(error_msg)
-            
-        response_text = response.json()["choices"][0]["message"]["content"]
-        return response_text
+        if os.path.exists(cache_file):
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+                if prompt in cache:
+                    logger.info("Cache hit!")
+                    return cache[prompt]
     except Exception as e:
-        error_msg = f"OpenRouter API call failed: {e}"
-        logger.error(error_msg)
-        raise Exception(error_msg)
+        logger.warning(f"Cache read error: {e}")
+    return None
 
 
-if __name__ == "__main__":
-    # Test each provider
-    if os.getenv("TEST_ALL_PROVIDERS", "false").lower() == "true":
-        test_prompt = "Hello, how are you? Respond in exactly one sentence."
-        for provider in ["openrouter", "gemini", "anthropic", "openai"]:
-            try:
-                os.environ["LLM_PROVIDER"] = provider
-                print(f"\nTesting {provider.upper()}...")
-                response = call_llm(test_prompt, use_cache=False)
-                print(f"Response: {response}")
-            except Exception as e:
-                print(f"Error with {provider}: {e}")
-    else:
-        # Simple test with default provider
-        test_prompt = "Hello, how are you?"
-        print("Making call...")
-        response = call_llm(test_prompt, use_cache=False)
-        print(f"Response: {response}")
+def _save_to_cache(prompt: str, response: str):
+    """Save response to cache"""
+    try:
+        cache = {}
+        if os.path.exists(cache_file):
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+        
+        cache[prompt] = response
+        
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(cache, f, indent=2)
+            
+    except Exception as e:
+        logger.warning(f"Cache write error: {e}")
+
+
+# Azure OpenAI Support
+def _call_azure_openai(prompt: str) -> str:
+    """Call Azure OpenAI API"""
+    from openai import AzureOpenAI
+    
+    client = AzureOpenAI(
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+    )
+    
+    response = client.chat.completions.create(
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4"),
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content

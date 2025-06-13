@@ -18,7 +18,9 @@ This is a tutorial project of [Pocket Flow](https://github.com/The-Pocket/Pocket
 
 - Check out the [Substack Post Tutorial](https://zacharyhuang.substack.com/p/ai-codebase-knowledge-builder-full) for more!
 
-&nbsp;&nbsp;**🔸 🎉 Reached Hacker News Front Page** (April 2025) with >800 up‑votes:  [Discussion »](https://news.ycombinator.com/item?id=43739456)
+&nbsp;&nbsp;**🔸 🎉 Reached Hacker News Front Page** (April 2025) with >900 up‑votes:  [Discussion »](https://news.ycombinator.com/item?id=43739456)
+
+&nbsp;&nbsp;**🔸 🎊 Online Service Now Live!** (May&nbsp;2025) Try our new online version at [https://code2tutorial.com/](https://code2tutorial.com/) – just paste a GitHub link, no installation needed!
 
 ## ⭐ Example Results for Popular GitHub Repositories!
 
@@ -62,6 +64,8 @@ This is a tutorial project of [Pocket Flow](https://github.com/The-Pocket/Pocket
 
 - [OpenManus](https://the-pocket.github.io/PocketFlow-Tutorial-Codebase-Knowledge/OpenManus) - Build AI agents with digital brains that think, learn, and use tools just like humans do!
 
+- [PocketFlow](https://the-pocket.github.io/PocketFlow-Tutorial-Codebase-Knowledge/PocketFlow) - 100-line LLM framework. Let Agents build Agents!
+
 - [Pydantic Core](https://the-pocket.github.io/PocketFlow-Tutorial-Codebase-Knowledge/Pydantic%20Core) - Validate data at rocket speed with just Python type hints!
 
 - [Requests](https://the-pocket.github.io/PocketFlow-Tutorial-Codebase-Knowledge/Requests) - Talk to the internet in Python with code so simple it feels like cheating!
@@ -72,49 +76,30 @@ This is a tutorial project of [Pocket Flow](https://github.com/The-Pocket/Pocket
 
 ## 🚀 Getting Started
 
-### Option 1: Use with Claude Desktop (Recommended for non-developers)
-
-The easiest way to use this tool is through Claude Desktop with our MCP (Model Context Protocol) server. Just chat with Claude to generate tutorials!
-
-➡️ **[See MCP Setup Guide](./MCP/README.md)** - 3 simple steps to get started
-
-### Option 2: Command Line Usage
-
 1. Clone this repository
    ```bash
    git clone https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge
    ```
 
-2. Install dependencies:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Configure your preferred LLM provider in `.env` file by copying `env.example`:
+4. Set up LLM in [`utils/call_llm.py`](./utils/call_llm.py) by providing credentials. By default, you can use the [AI Studio key](https://aistudio.google.com/app/apikey) with this client for Gemini Pro 2.5:
+
+   ```python
+   client = genai.Client(
+     api_key=os.getenv("GEMINI_API_KEY", "your-api_key"),
+   )
+   ```
+
+   You can use your own models. We highly recommend the latest models with thinking capabilities (Claude 3.7 with thinking, O1). You can verify that it is correctly set up by running:
    ```bash
-   cp env.example .env
+   python utils/call_llm.py
    ```
 
-   Then edit the `.env` file to add your API keys and configure your preferred provider:
-   ```
-   # Default LLM provider (openrouter, gemini, anthropic, openai)
-   LLM_PROVIDER=gemini
-
-   # API keys for different providers
-   GEMINI_API_KEY=your_gemini_key
-   OPENROUTER_API_KEY=your_openrouter_key
-   ANTHROPIC_API_KEY=your_anthropic_key
-   OPENAI_API_KEY=your_openai_key
-   ```
-
-   You can test your configuration with the provided utility:
-   ```bash
-   python test_llm_providers.py
-   # Or test a specific provider
-   python test_llm_providers.py openai
-   ```
-
-4. Generate a complete codebase tutorial by running the main script:
+5. Generate a complete codebase tutorial by running the main script:
     ```bash
     # Analyze a GitHub repository
     python main.py --repo https://github.com/username/repo --include "*.py" "*.js" --exclude "tests/*" --max-size 50000
@@ -124,9 +109,6 @@ The easiest way to use this tool is through Claude Desktop with our MCP (Model C
 
     # Or, generate a tutorial in Chinese
     python main.py --repo https://github.com/username/repo --language "Chinese"
-    
-    # Specify a different LLM provider
-    python main.py --repo https://github.com/username/repo --llm-provider openai
     ```
 
     - `--repo` or `--dir` - Specify either a GitHub repo URL or a local directory path (required, mutually exclusive)
@@ -139,9 +121,46 @@ The easiest way to use this tool is through Claude Desktop with our MCP (Model C
     - `--language` - Language for the generated tutorial (default: "english")
     - `--max-abstractions` - Maximum number of abstractions to identify (default: 10)
     - `--no-cache` - Disable LLM response caching (default: caching enabled)
-    - `--llm-provider` - LLM provider to use (default: from env or gemini, choices: openrouter, gemini, anthropic, openai)
 
 The application will crawl the repository, analyze the codebase structure, generate tutorial content in the specified language, and save the output in the specified directory (default: ./output).
+
+
+<details>
+ 
+<summary> 🐳 <b>Running with Docker</b> </summary>
+
+To run this project in a Docker container, you'll need to pass your API keys as environment variables. 
+
+1. Build the Docker image
+   ```bash
+   docker build -t pocketflow-app .
+   ```
+
+2. Run the container
+
+   You'll need to provide your `GEMINI_API_KEY` for the LLM to function. If you're analyzing private GitHub repositories or want to avoid rate limits, also provide your `GITHUB_TOKEN`.
+   
+   Mount a local directory to `/app/output` inside the container to access the generated tutorials on your host machine.
+   
+   **Example for analyzing a public GitHub repository:**
+   
+   ```bash
+   docker run -it --rm \
+     -e GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE" \
+     -v "$(pwd)/output_tutorials":/app/output \
+     pocketflow-app --repo https://github.com/username/repo
+   ```
+   
+   **Example for analyzing a local directory:**
+   
+   ```bash
+   docker run -it --rm \
+     -e GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE" \
+     -v "/path/to/your/local_codebase":/app/code_to_analyze \
+     -v "$(pwd)/output_tutorials":/app/output \
+     pocketflow-app --dir /app/code_to_analyze
+   ```
+</details>
 
 ## 💡 Development Tutorial
 
@@ -158,3 +177,6 @@ The application will crawl the repository, analyze the codebase structure, gener
   </a>
 </div>
 <br>
+
+
+

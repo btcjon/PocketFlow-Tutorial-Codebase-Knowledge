@@ -30,38 +30,20 @@ async def list_tools() -> List[Tool]:
     return [
         Tool(
             name="generate_tutorial",
-            description="Generate a comprehensive tutorial from a codebase. NOTE: This process typically takes 5-10 minutes to complete as it analyzes the entire codebase and generates detailed documentation.",
+            description="Generate a comprehensive tutorial from a codebase. Just provide the GitHub URL or local directory path. The process typically takes 5-10 minutes.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "source": {
                         "type": "string",
-                        "description": "GitHub repository URL or local directory path"
-                    },
-                    "source_type": {
-                        "type": "string",
-                        "enum": ["repo", "dir"],
-                        "description": "Either 'repo' for GitHub URL or 'dir' for local directory"
-                    },
-                    "output_dir": {
-                        "type": "string",
-                        "description": "Directory to save the tutorial (optional)"
+                        "description": "GitHub repository URL (e.g. https://github.com/user/repo) or local directory path"
                     },
                     "language": {
                         "type": "string",
                         "description": "Language for the tutorial (default: English)"
-                    },
-                    "llm_provider": {
-                        "type": "string",
-                        "enum": ["gemini", "openai", "anthropic", "openrouter"],
-                        "description": "LLM provider to use"
-                    },
-                    "llm_model": {
-                        "type": "string",
-                        "description": "Specific model to use (optional)"
                     }
                 },
-                "required": ["source", "source_type"]
+                "required": ["source"]
             }
         ),
         Tool(
@@ -100,11 +82,7 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
     if name == "generate_tutorial":
         result = await generate_tutorial(
             source=arguments["source"],
-            source_type=arguments.get("source_type", "repo"),
-            output_dir=arguments.get("output_dir"),
-            language=arguments.get("language", "English"),
-            llm_provider=arguments.get("llm_provider", "gemini"),
-            llm_model=arguments.get("llm_model")
+            language=arguments.get("language", "English")
         )
         return [TextContent(type="text", text=result["message"])]
     
@@ -134,74 +112,31 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
 async def generate_tutorial(
     source: str,
-    source_type: str = "repo",
-    output_dir: Optional[str] = None,
-    language: str = "English",
-    llm_provider: str = "gemini",
-    llm_model: Optional[str] = None
+    language: str = "English"
 ) -> Dict[str, Any]:
     """
     Generate a comprehensive tutorial from a codebase.
     
     Args:
         source: GitHub repository URL or local directory path
-        source_type: Either "repo" for GitHub URL or "dir" for local directory
-        output_dir: Directory to save the tutorial. If not specified:
-                   - For GitHub repos: ~/Dropbox/tutorial-docs/
-                   - For local dirs: <source_dir>/mydocs/
-                   - You can use ~ for home directory (e.g., "~/Desktop/docs")
         language: Language for the tutorial (default: English)
-        llm_provider: LLM provider to use (gemini, openai, anthropic, openrouter)
-        llm_model: Specific model to use (optional, uses provider default if not specified)
     
     Returns:
         Dictionary containing:
         - success: Boolean indicating if generation succeeded
-        - tutorial_path: Path to the generated tutorial file
-        - relative_path: Path relative to current directory (if applicable)
+        - tutorial_path: Path to the generated tutorial folder
+        - relative_path: Path relative to current directory
         - message: Success or error message with file location
     
-    Examples:
-        - Generate tutorial for a GitHub repo: saves to ~/Dropbox/tutorial-docs/
-        - Generate tutorial for /path/to/project: saves to /path/to/project/mydocs/
-        - Specify custom output: output_dir="~/Desktop/my-tutorials"
+    Tutorials are automatically saved to:
+    /Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge/docs/{project_name}/
     """
     try:
-        # Validate source type
-        if source_type not in ["repo", "dir"]:
-            return {
-                "success": False,
-                "message": "source_type must be either 'repo' or 'dir'"
-            }
-        
-        # Determine output directory
-        if output_dir is None:
-            # Default behavior: Use ~/Dropbox/tutorial-docs/
-            default_base = os.path.expanduser("~/Dropbox/tutorial-docs")
-            output_dir = default_base
-            
-            # If analyzing a local directory, try to save in that directory's mydocs
-            if source_type == "dir" and source:
-                local_mydocs = os.path.join(source, "mydocs")
-                if os.path.exists(source):
-                    output_dir = local_mydocs
+        # Auto-detect source type
+        if source.startswith(("http://", "https://", "git@")):
+            source_type = "repo"
         else:
-            # If output_dir is provided, expand ~ and make absolute
-            output_dir = os.path.expanduser(output_dir)
-            if not os.path.isabs(output_dir):
-                output_dir = os.path.join(os.getcwd(), output_dir)
-        
-        # Create output directory if it doesn't exist
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        
-        # Log where we're saving
-        print(f"[MCP Server] Saving tutorial to: {output_dir}")
-        
-        # Set LLM provider and model via environment variables
-        os.environ["LLM_PROVIDER"] = llm_provider
-        if llm_model:
-            # Store model in environment variable for the nodes to use
-            os.environ[f"{llm_provider.upper()}_MODEL"] = llm_model
+            source_type = "dir"
         
         # Create the tutorial flow
         flow = create_tutorial_flow()
@@ -232,7 +167,7 @@ async def generate_tutorial(
             "language": language,
             "use_cache": True,
             "max_abstraction_num": 10,
-            "llm_provider": llm_provider,
+            "llm_provider": os.environ.get("LLM_PROVIDER", "openrouter"),  # Use env config
             
             # Will be populated by nodes
             "files": [],

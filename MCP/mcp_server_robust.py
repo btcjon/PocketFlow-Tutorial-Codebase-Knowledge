@@ -1,18 +1,37 @@
 #!/usr/bin/env python3
 """
-MCP Server for Tutorial Codebase Knowledge Generator
+MCP Server for Tutorial Codebase Knowledge Generator - Robust Version
 """
 
 import asyncio
 import json
 import sys
-from typing import Any
-from datetime import datetime
 import os
-from pathlib import Path
+import traceback
+from typing import Any
 
-# Import the existing tutorial generation logic
-from flow import create_tutorial_flow
+def log_error(message: str):
+    """Log error to stderr"""
+    print(f"ERROR: {message}", file=sys.stderr)
+
+def log_info(message: str):
+    """Log info to stderr"""
+    print(f"INFO: {message}", file=sys.stderr)
+
+# Try to import dependencies with proper error handling
+try:
+    # Add parent directory to Python path
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    
+    from flow import create_tutorial_flow
+    log_info("Successfully imported flow module")
+except ImportError as e:
+    log_error(f"Failed to import flow module: {e}")
+    log_error(f"Python path: {sys.path}")
+    log_error(f"Working directory: {os.getcwd()}")
+    sys.exit(1)
 
 async def handle_list_tools(request_id: Any) -> dict:
     """Handle tools/list request."""
@@ -69,6 +88,8 @@ async def handle_call_tool(request_id: Any, params: dict) -> dict:
             # Language is optional, default to English
             language = args.get("language", "English")
             
+            log_info(f"Generating tutorial for {source} (type: {source_type}, language: {language})")
+            
             # Create the tutorial flow
             flow = create_tutorial_flow()
             
@@ -124,6 +145,8 @@ async def handle_call_tool(request_id: Any, params: dict) -> dict:
             message = f"Tutorial successfully generated!\n\nSaved to: {rel_path}\nFull path: {abs_path}\n\nThe tutorial includes multiple files (index.md and chapter files)."
             
         except Exception as e:
+            log_error(f"Error in generate_tutorial: {str(e)}")
+            log_error(traceback.format_exc())
             message = f"Error generating tutorial: {str(e)}"
         
         return {
@@ -153,6 +176,8 @@ async def handle_request(request: dict) -> dict:
     method = request.get("method")
     request_id = request.get("id")
     params = request.get("params", {})
+    
+    log_info(f"Handling method: {method}")
     
     if method == "initialize":
         return {
@@ -185,33 +210,48 @@ async def handle_request(request: dict) -> dict:
 
 async def main():
     """Run the MCP server."""
-    print("MCP Server starting...", file=sys.stderr)
+    log_info("MCP Server starting...")
+    log_info(f"Python version: {sys.version}")
+    log_info(f"Working directory: {os.getcwd()}")
+    log_info(f"Python path: {sys.path}")
     
     # Read from stdin, write to stdout
     while True:
         try:
             line = sys.stdin.readline()
             if not line:
-                print("No more input, exiting", file=sys.stderr)
+                log_info("No more input, exiting")
                 break
             
-            print(f"Received: {line.strip()}", file=sys.stderr)
+            # Skip empty lines
+            line = line.strip()
+            if not line:
+                continue
+                
+            log_info(f"Received: {line}")
             
             request = json.loads(line)
             response = await handle_request(request)
             
-            print(f"Sending: {json.dumps(response)}", file=sys.stderr)
-            print(json.dumps(response))
+            response_str = json.dumps(response)
+            log_info(f"Sending: {response_str}")
+            print(response_str)
             sys.stdout.flush()
             
         except json.JSONDecodeError as e:
-            print(f"JSON decode error: {e}", file=sys.stderr)
-            print(f"Line was: {line}", file=sys.stderr)
+            log_error(f"JSON decode error: {e}")
+            log_error(f"Line was: {line}")
         except Exception as e:
             # Log errors to stderr
-            print(f"Error: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc(file=sys.stderr)
+            log_error(f"Error: {e}")
+            log_error(traceback.format_exc())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log_info("Server stopped by user")
+    except Exception as e:
+        log_error(f"Fatal error: {e}")
+        log_error(traceback.format_exc())
+        sys.exit(1)

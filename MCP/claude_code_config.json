@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "tutorial-codebase-knowledge": {
+      "command": "python",
+      "args": ["MCP/mcp_server_simple.py"],
+      "cwd": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge",
+      "env": {
+        "PYTHONPATH": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge"
+      }
+    }
+  }
+}

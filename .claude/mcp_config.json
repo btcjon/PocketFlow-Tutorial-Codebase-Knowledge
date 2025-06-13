@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "tutorial-codebase-knowledge": {
+      "command": "python",
+      "args": ["MCP/mcp_server_simple.py"],
+      "cwd": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge",
+      "env": {
+        "PYTHONPATH": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge",
+        "LLM_PROVIDER": "openrouter",
+        "OPENROUTER_API_KEY": "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"
+      },
+      "description": "Generate comprehensive tutorials from codebases"
+    }
+  }
+}

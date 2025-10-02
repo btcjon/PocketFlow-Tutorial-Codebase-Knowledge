@@ -4,6 +4,7 @@ import logging
 import json
 import requests
 from datetime import datetime
+import tiktoken
 
 # Configure logging
 log_directory = os.getenv("LOG_DIR", "logs")
@@ -32,8 +33,11 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
     The LLM provider is determined by the LLM_PROVIDER environment variable.
     If not set, it falls back to the provider specified in code.
     """
+    # Check and truncate prompt if too long
+    prompt = _ensure_prompt_fits_context(prompt)
+    
     # Log the prompt
-    logger.info(f"PROMPT: {prompt}")
+    logger.info(f"PROMPT: {prompt[:500]}..." if len(prompt) > 500 else f"PROMPT: {prompt}")
 
     # Check cache if enabled
     if use_cache:
@@ -77,7 +81,7 @@ def _call_gemini(prompt: str) -> str:
     """Call Google Gemini API"""
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY")))
     response = client.models.generate_content(
-        model="gemini-2.0-flash-exp", contents=prompt
+        model="google/gemini-2.5-flash", contents=prompt
     )
     return response.text
 
@@ -119,7 +123,7 @@ def _call_openrouter(prompt: str) -> str:
     }
     
     data = {
-        "model": os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-thinking-exp:free"),
+        "model": os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash"),
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7
     }
@@ -129,6 +133,16 @@ def _call_openrouter(prompt: str) -> str:
         headers=headers,
         json=data
     )
+    
+    if response.status_code == 400 and "maximum context length" in response.text:
+        # Try with middle-out transform as suggested by the error
+        data["transforms"] = ["middle-out"]
+        logger.warning("Prompt too long, retrying with middle-out transform")
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=data
+        )
     
     if response.status_code != 200:
         raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
@@ -165,6 +179,45 @@ def _save_to_cache(prompt: str, response: str):
             
     except Exception as e:
         logger.warning(f"Cache write error: {e}")
+
+
+def _count_tokens(text: str) -> int:
+    """Estimate token count using tiktoken (works for most models)"""
+    try:
+        encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
+        return len(encoding.encode(text))
+    except Exception:
+        # Fallback: rough estimate of 4 chars per token
+        return len(text) // 4
+
+
+def _ensure_prompt_fits_context(prompt: str, max_tokens: int = 900000) -> str:
+    """Ensure prompt fits within context limits by truncating if necessary"""
+    token_count = _count_tokens(prompt)
+    
+    if token_count <= max_tokens:
+        return prompt
+    
+    logger.warning(f"Prompt too long ({token_count} tokens), truncating to fit {max_tokens} tokens")
+    
+    # Calculate target character count (rough estimate)
+    target_chars = int(max_tokens * 3.5)  # Conservative estimate
+    
+    if len(prompt) <= target_chars:
+        return prompt
+    
+    # Keep beginning and end of prompt, truncate middle
+    keep_start = target_chars // 3
+    keep_end = target_chars // 3
+    
+    truncated_prompt = (
+        prompt[:keep_start] + 
+        f"\n\n... [CONTENT TRUNCATED - Original length: {len(prompt)} chars, {token_count} tokens] ...\n\n" +
+        prompt[-keep_end:]
+    )
+    
+    logger.info(f"Truncated prompt from {len(prompt)} to {len(truncated_prompt)} characters")
+    return truncated_prompt
 
 
 # Azure OpenAI Support

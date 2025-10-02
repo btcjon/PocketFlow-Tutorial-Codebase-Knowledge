@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "tutorial-codebase-knowledge": {
-      "url": "https://tutorial-codebase-knowledge.thesystem.workers.dev",
-      "transport": "sse"
-    }
-  }
-}

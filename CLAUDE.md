@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 Tutorial-Codebase-Knowledge is an AI-powered tool that transforms complex codebases into beginner-friendly tutorials. It uses PocketFlow to orchestrate a workflow that analyzes code repositories and generates comprehensive tutorials explaining code structure and key concepts.
@@ -9,71 +7,169 @@ Tutorial-Codebase-Knowledge is an AI-powered tool that transforms complex codeba
 ## Common Development Commands
 
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
 # Run the main application to analyze a GitHub repository
 python main.py --repo <github-url>
 
-# Run the main application to analyze a local directory
+# Run the main application to analyze a local directory  
 python main.py --dir <path>
+
+# Generate tutorial with specific options
+python main.py --repo <url> --language "Chinese" --max-abstractions 8 --llm-provider openrouter
 
 # Test LLM provider configurations
 python test_llm_providers.py
 
 # List available models for all providers
 python list_models.py
+
+# Test direct LLM calls
+python utils/call_llm.py
+
+# Build MCP server
+cd npm-mcp-server && npm run build
+
+# Development mode for MCP server
+cd npm-mcp-server && npm run dev
 ```
 
 ## High-Level Architecture
 
 The application follows a sequential workflow pattern implemented using PocketFlow:
 
-1. **Entry Points**:
-   - `main.py` - CLI interface that accepts GitHub URLs or local directories
-   - `flow.py` - Defines the PocketFlow workflow with 7 sequential nodes
+### Core Workflow (8 Sequential Nodes)
 
-2. **Workflow Nodes** (defined in `nodes.py`):
-   - `FetchRepo` - Downloads/reads repository files
-   - `IdentifyAbstractions` - Extracts key concepts and patterns
-   - `AnalyzeRelationships` - Maps connections between abstractions
-   - `OrderChapters` - Determines optimal tutorial structure
-   - `WriteChapters` - Generates tutorial content for each abstraction
-   - `CombineTutorial` - Assembles final tutorial document
-   - `MoveToDocs` - Moves generated tutorial from output folder to docs folder
+1. **FetchRepo** (`nodes.py:31`) - Downloads/reads repository files using `utils/crawl_github_files.py` or `utils/crawl_local_files.py`
+2. **IdentifyAbstractions** (`nodes.py:93`) - Extracts 5-10 core concepts and patterns using LLM analysis
+3. **AnalyzeRelationships** (`nodes.py:267`) - Maps connections between abstractions and generates project summary
+4. **OrderChapters** (`nodes.py:444`) - Determines optimal tutorial structure based on dependencies
+5. **WriteChapters** (`nodes.py:571`) - Generates detailed tutorial content for each abstraction (BatchNode)
+6. **CombineTutorial** (`nodes.py:787`) - Assembles final tutorial with index and Mermaid diagrams
+7. **MergeToSingleFile** (`nodes.py:917`) - Combines all chapters into single tutorial file
+8. **MoveToDocs** (`nodes.py:1032`) - Moves generated tutorial from output to docs folder
 
-3. **Key Components**:
-   - `utils/call_llm.py` - Unified interface for multiple LLM providers (Gemini, OpenAI, Anthropic, OpenRouter)
-   - `utils/crawl_github_files.py` - GitHub repository file fetching
-   - `utils/crawl_local_files.py` - Local directory file reading
-   - Caching system in `logs/` for efficient re-processing
-   - Output tutorials saved to `output/` directory
+### Key Components
 
-4. **Configuration**:
-   - LLM providers configured via environment variables in `.env`
-   - Default models and settings specified in utility modules
-   - File filtering and size limits configurable in crawl utilities
+- **Entry Points**:
+  - `main.py` - CLI interface with comprehensive argument parsing
+  - `flow.py` - PocketFlow workflow definition with node connections
+
+- **LLM Integration**:
+  - `utils/call_llm.py` - Unified interface for multiple providers (Gemini, OpenAI, Anthropic, OpenRouter)
+  - Supports caching, logging, and provider fallbacks
+  - Environment-based provider selection via `LLM_PROVIDER`
+
+- **File Processing**:
+  - Smart file filtering with include/exclude patterns
+  - Size limits and content truncation for large files
+  - Support for multiple programming languages
+
+- **Output Management**:
+  - Multi-format output (separate chapters + combined tutorial)
+  - Mermaid diagram generation for relationships
+  - Multi-language tutorial support
+
+### MCP Server Architecture
+
+- **NPM Package**: `npm-mcp-server/` - TypeScript implementation wrapping Python engine
+- **Tools**: generate_tutorial, list_generated_tutorials, get_tutorial_content
+- **Smart Defaults**: Different save locations for GitHub repos vs local directories
+
+## Configuration System
+
+### Environment Variables
+- `LLM_PROVIDER` - Provider selection (gemini, openai, anthropic, openrouter)
+- `GEMINI_API_KEY` / `GOOGLE_API_KEY` - For Gemini
+- `OPENAI_API_KEY` - For OpenAI  
+- `ANTHROPIC_API_KEY` - For Claude
+- `OPENROUTER_API_KEY` - For OpenRouter
+- `GITHUB_TOKEN` - For private repos and rate limiting
+
+### File Patterns (configurable via CLI)
+- **Default Include**: `*.py`, `*.js`, `*.jsx`, `*.ts`, `*.tsx`, `*.go`, `*.java`, `*.c`, `*.cpp`, `*.h`, `*.md`, `*.rst`, `*Dockerfile`, `*Makefile`, `*.yaml`, `*.yml`
+- **Default Exclude**: `*test*`, `*docs/*`, `*venv/*`, `*node_modules/*`, `*build/*`, `*dist/*`, `.git/*`
 
 ## Key Design Patterns
 
-- **Workflow Pattern**: Sequential processing with each node building on previous results
-- **Provider Abstraction**: Single interface supporting multiple LLM providers
-- **Caching Strategy**: Results cached by repository URL/path to avoid redundant processing
-- **Error Handling**: Graceful fallbacks when providers are unavailable
+- **Sequential Workflow**: Each node builds on previous results with proper data validation
+- **Provider Abstraction**: Single `call_llm()` interface supporting multiple LLM providers
+- **Batch Processing**: `WriteChapters` uses BatchNode for parallel chapter generation
+- **Caching Strategy**: LLM responses cached with prompt-based keys in `llm_cache.json`
+- **Error Handling**: Node-level retries with exponential backoff
+- **Content Truncation**: Smart truncation preserving beginning/end of large files
+
+## Testing and Debugging
+
+- No formal test framework - relies on manual testing with real repositories
+- LLM call logging in `logs/llm_calls_YYYYMMDD.log`
+- Cache inspection via `llm_cache.json`
+- Verbose output during workflow execution for debugging
+
+## Development Tips
+
+- Use `--no-cache` flag when testing LLM prompt changes
+- Adjust `--max-abstractions` for different complexity codebases  
+- Test with `test_llm_providers.py` before running full workflow
+- Monitor logs for LLM call patterns and errors
+- MCP server requires rebuilding (`npm run build`) after TypeScript changes
+
+## Context Length Issues
+
+If you encounter "maximum context length" errors:
+
+1. **Automatic Handling**: The system now automatically:
+   - Counts tokens and truncates prompts before sending to LLM
+   - Uses OpenRouter's "middle-out" transform for context compression
+   - Applies more aggressive file content truncation for large codebases
+
+2. **Manual Adjustments**:
+   - Reduce `--max-abstractions` (try 5-6 instead of 10)
+   - Use more restrictive `--include` patterns
+   - Add more `--exclude` patterns to filter out large files
+   - Increase `--max-size` limit to exclude very large files
+
+3. **Model Selection**: Some models have larger context windows:
+   - Claude models: ~200K tokens
+   - GPT-4 Turbo: ~128K tokens  
+   - Gemini 2.5 Flash: ~1M tokens
+   - Set via `OPENROUTER_MODEL` environment variable
 
 ## MCP Server Usage
 
-This tool is now available as an MCP (Model Context Protocol) server, allowing it to be used from Claude Desktop or other MCP-compatible tools.
+This tool is available as an MCP (Model Context Protocol) server built with TypeScript/Node.js for maximum reliability and compatibility with Claude Desktop.
 
-### Local MCP Server (Recommended)
+### NPM-Based MCP Server (Current Implementation)
 
-The local MCP server saves tutorials directly to `./mydocs` in your current working directory, making it perfect for documenting projects you're actively working on.
+The MCP server is now packaged as a Node.js application that wraps the Python tutorial generation engine. This provides better reliability and follows the same pattern as official MCP servers.
 
-#### Setup
+#### Current Setup
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+The server is configured in Claude Desktop at:
+`~/Library/Application Support/Claude/claude_desktop_config.json`
 
-2. The server is already configured in Claude Desktop. Just restart Claude Desktop to use it.
+```json
+{
+  "mcpServers": {
+    "tutorial-codebase-knowledge": {
+      "command": "node",
+      "args": ["/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge/npm-mcp-server/build/index.js"],
+      "env": {
+        "LLM_PROVIDER": "openrouter",
+        "OPENROUTER_API_KEY": "your-api-key"
+      },
+      "description": "Generate comprehensive tutorials from codebases"
+    }
+  }
+}
+```
+
+#### Package Structure
+
+- `npm-mcp-server/` - TypeScript MCP server implementation
+- `npm-mcp-server/src/index.ts` - Main MCP server with tool definitions
+- `npm-mcp-server/build/` - Compiled JavaScript output
 
 #### Key Features
 
@@ -120,19 +216,19 @@ When the MCP server is configured, you can use it like this:
 **Basic usage:**
 ```
 "Generate a tutorial for https://github.com/langchain-ai/langchain"
-→ Saves to: ~/Dropbox/tutorial-docs/tutorial_langchain_20250525_103045.md
+� Saves to: ~/Dropbox/tutorial-docs/tutorial_langchain_20250525_103045.md
 
 "Generate a tutorial for my local project at /Users/me/myproject"
-→ Saves to: /Users/me/myproject/mydocs/tutorial_myproject_20250525_103045.md
+� Saves to: /Users/me/myproject/mydocs/tutorial_myproject_20250525_103045.md
 ```
 
 **With custom output:**
 ```
 "Generate a tutorial for https://github.com/example/repo and save it to ~/Desktop/docs"
-→ Saves to: ~/Desktop/docs/tutorial_repo_20250525_103045.md
+� Saves to: ~/Desktop/docs/tutorial_repo_20250525_103045.md
 
 "List all tutorials in ~/Dropbox/tutorial-docs"
-→ Shows all tutorials in the default location
+� Shows all tutorials in the default location
 ```
 
 **Pro tip:** When analyzing a local project, the tutorial is saved directly in that project's `mydocs` folder, making it easy to commit the documentation with your code!

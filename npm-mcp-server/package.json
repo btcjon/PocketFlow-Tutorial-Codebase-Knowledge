@@ -1,0 +1,36 @@
+{
+  "name": "@btcjon/tutorial-codebase-knowledge-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for generating comprehensive tutorials from codebases",
+  "main": "./build/index.js",
+  "type": "module",
+  "bin": {
+    "tutorial-codebase-knowledge": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["mcp", "model-context-protocol", "tutorial", "codebase", "documentation", "llm"],
+  "author": "btcjon",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.2",
+    "zod": "^3.25.64"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.1",
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/btcjon/PocketFlow-Tutorial-Codebase-Knowledge.git"
+  }
+}

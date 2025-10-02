@@ -8,7 +8,7 @@ from utils.crawl_local_files import crawl_local_files
 
 
 # Helper to get content for specific file indices
-def get_content_for_indices(files_data, indices, max_chars_per_file=8000):
+def get_content_for_indices(files_data, indices, max_chars_per_file=6000):
     content_map = {}
     for i in indices:
         if 0 <= i < len(files_data):
@@ -101,7 +101,7 @@ class IdentifyAbstractions(Node):
         llm_provider = shared.get("llm_provider", "openrouter")  # Get llm_provider, default to openrouter
 
         # Helper to create context from files, respecting limits (basic example)
-        def create_llm_context(files_data, max_chars_per_file=6000):
+        def create_llm_context(files_data, max_chars_per_file=4000):
             context = ""
             file_info = []  # Store tuples of (index, path)
             for i, (path, content) in enumerate(files_data):
@@ -297,7 +297,7 @@ class AnalyzeRelationships(Node):
         context += "\\nRelevant File Snippets (Referenced by Index and Path):\\n"
         # Get content for relevant files using helper
         relevant_files_content_map = get_content_for_indices(
-            files_data, sorted(list(all_relevant_indices)), max_chars_per_file=5000
+            files_data, sorted(list(all_relevant_indices)), max_chars_per_file=3000
         )
         # Format file content for context
         file_context_str = "\\n\\n".join(
@@ -622,7 +622,7 @@ class WriteChapters(BatchNode):
                 related_file_indices = abstraction_details.get("files", [])
                 # Get content using helper, passing indices
                 related_files_content_map = get_content_for_indices(
-                    files_data, related_file_indices, max_chars_per_file=10000
+                    files_data, related_file_indices, max_chars_per_file=6000
                 )
 
                 # Get previous chapter info for transitions (uses potentially translated name)

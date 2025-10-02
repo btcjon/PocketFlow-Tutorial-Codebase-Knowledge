@@ -4,28 +4,38 @@ This file tracks all customizations made to the original Tutorial-Codebase-Knowl
 
 ## Added Features
 
-### 1. MCP (Model Context Protocol) Server Implementation
-- **Location**: `MCP/` directory
+### 1. NPM-Based MCP (Model Context Protocol) Server
+- **Location**: `npm-mcp-server/` directory
 - **Files Added**:
-  - `mcp_server.py` - Original simple implementation
-  - `mcp_server_simple.py` - Simplified version
-  - `mcp_server_robust.py` - Production-ready version with error handling
-  - `setup_mcp.sh` - Setup script for MCP configuration
-  - `claude_desktop_config.json` - Claude Desktop configuration
-  - `claude_code_config.json` - Claude Code configuration
-  - `LOCAL_MACHINE_SETUP.md` - Documentation for local MCP setup
-- **Purpose**: Enables using the tool directly from Claude Desktop/Code via MCP protocol
+  - `src/index.ts` - TypeScript MCP server implementation
+  - `package.json` - NPM package configuration
+  - `tsconfig.json` - TypeScript configuration
+  - `README.md` - NPM package documentation
+  - `LICENSE` - MIT license
+- **Purpose**: Reliable NPM-based MCP server that wraps Python functionality for Claude Desktop integration
 
-### 2. MoveToDocs Workflow Node
-- **File**: `nodes.py` (lines 917-960)
+### 2. Cloudflare Worker Implementation
+- **Location**: `worker/` directory
+- **Purpose**: Alternative serverless deployment option using Cloudflare Workers
+- **Features**: Remote MCP server accessible via URL
+
+### 3. MoveToDocs Workflow Node
+- **File**: `nodes.py` (lines 1032-1070)
 - **Purpose**: Automatically moves generated tutorials from `output/` to `docs/` folder
 - **Integration**: Added to workflow in `flow.py`
 
-### 3. Documentation Organization
-- **Added Folders**:
-  - `docs/claude-squad/` - Generated tutorial example
-  - `docs/infinite-agentic-loop/` - Generated tutorial example
-  - `docs/nanobrowser/` - Generated tutorial example
+### 4. MergeToSingleFile Workflow Node
+- **File**: `nodes.py` (lines 917-1030)
+- **Purpose**: Combines index.md and all chapter files into a single `{project_name}_tutorial.md` file
+- **Features**:
+  - Creates table of contents with anchor links
+  - Maintains project summary and mermaid diagram
+  - Merges all chapters in proper order
+  - Cleans up individual files after merging
+- **Integration**: Added between CombineTutorial and MoveToDocs in workflow
+
+### 5. Documentation Organization
+- **Added Folders**: Extensive `docs/` directory with 25+ generated tutorial examples
 
 ## Modified Files
 
@@ -56,18 +66,21 @@ This file tracks all customizations made to the original Tutorial-Codebase-Knowl
 ## How to Preserve These During Updates
 
 1. **Critical Files to Watch**:
-   - `MCP/` directory (completely custom)
-   - `nodes.py` (contains MoveToDocs class)
+   - `npm-mcp-server/` directory (completely custom NPM implementation)
+   - `worker/` directory (completely custom Cloudflare Worker)
+   - `nodes.py` (contains MoveToDocs and MergeToSingleFile classes)
    - `flow.py` (modified workflow)
 
 2. **Merge Strategy**:
-   - The `MCP/` directory is entirely our addition, so conflicts are unlikely
+   - The `npm-mcp-server/` and `worker/` directories are entirely our additions
    - For `nodes.py` and `flow.py`, carefully review changes during merges
    - Use `git diff` to compare before merging
 
 3. **Testing After Updates**:
-   - Test MCP server: `python MCP/mcp_server_robust.py`
-   - Test MoveToDocs: Run a tutorial generation and verify it moves to `docs/`
+   - Test NPM MCP server: `cd npm-mcp-server && npm run build && node build/index.js`
+   - Test CLI: `python main.py --repo https://github.com/example/repo`
+   - Test MoveToDocs: Run tutorial generation and verify it moves to `docs/`
+   - Test MergeToSingleFile: Verify single `{project}_tutorial.md` file is created
    - Test with Claude Desktop if configured
 
 ## Potential Conflict Areas

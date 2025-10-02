@@ -1,56 +1,45 @@
 # Local Machine MCP Setup Guide
 
-> **For Jon's Local Machine** - Super simplified! Just copy configs and use.
+> **For Jon's Local Machine** - Super simplified! NPM-based MCP server now working perfectly.
 
-## Quick Setup (2 steps)
+## Quick Setup (1 step)
 
-Since everything is already installed and configured on your machine, just add the MCP server to your clients.
+The MCP server is now packaged as an NPM module for better reliability and easier maintenance.
 
-### 1. Claude Desktop Setup
+### Claude Desktop Setup
 
-Copy the pre-made config:
+The server is already configured in your Claude Desktop at:
+`~/Library/Application Support/Claude/claude_desktop_config.json`
 
-```bash
-cp MCP/claude_desktop_config.json ~/Library/Application\ Support/Claude/claude_desktop_config.json
-```
-
-Or manually add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
+Current working configuration:
 ```json
 {
   "mcpServers": {
     "tutorial-codebase-knowledge": {
-      "command": "python",
-      "args": ["mcp_server_simple.py"],
-      "cwd": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge/MCP",
+      "command": "node",
+      "args": ["/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge/npm-mcp-server/build/index.js"],
       "env": {
-        "PYTHONPATH": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge"
-      }
+        "LLM_PROVIDER": "openrouter",
+        "OPENROUTER_API_KEY": "your-api-key"
+      },
+      "description": "Generate comprehensive tutorials from codebases"
     }
   }
 }
 ```
 
-### 2. Claude Code Setup
+### Alternative: NPX Setup (for published version)
 
-Copy the pre-made config:
-
-```bash
-mkdir -p .claude
-cp MCP/claude_code_config.json .claude/mcp_config.json
-```
-
-Or manually create `.claude/mcp_config.json`:
-
+When the package is published to NPM, you can use:
 ```json
 {
   "mcpServers": {
     "tutorial-codebase-knowledge": {
-      "command": "python",
-      "args": ["MCP/mcp_server_simple.py"],
-      "cwd": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge",
+      "command": "npx",
+      "args": ["@btcjon/tutorial-codebase-knowledge-mcp"],
       "env": {
-        "PYTHONPATH": "/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge"
+        "LLM_PROVIDER": "openrouter",
+        "OPENROUTER_API_KEY": "your-api-key"
       }
     }
   }
@@ -110,7 +99,7 @@ Create a tutorial for the current directory
 
 **File Patterns**: Automatically includes common code files (`.py`, `.js`, `.ts`, etc.) and excludes test/build directories
 
-**Output Directory**: Always saves to `/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge/docs/{project_name}/`
+**Output Directory**: Always saves to `/Users/jonbennett/Dropbox/Coding-Main/Tutorial-Codebase-Knowledge/docs/{project_name}/` as a single `{project_name}_tutorial.md` file
 
 ## Troubleshooting
 
@@ -124,15 +113,14 @@ Create a tutorial for the current directory
 
 ```
 docs/{project_name}/
-├── index.md              # Overview with project summary and diagram
-├── 01_concept.md          # First key concept  
-├── 02_concept.md          # Second key concept
-├── 03_concept.md          # Third key concept
-└── ...                    # Up to 10 concepts total
+└── {project_name}_tutorial.md   # Complete tutorial in one file
 ```
 
 Each tutorial includes:
-- ✅ Beginner-friendly explanations
+- ✅ Project summary with mermaid relationship diagram
+- ✅ Table of contents with anchor links
+- ✅ Beginner-friendly explanations for all key concepts
 - ✅ Code examples with context  
-- ✅ Mermaid diagrams showing relationships
+- ✅ Implementation details and analogies
 - ✅ Cross-references between concepts
+- ✅ Single structured markdown file (no more multiple files!)

@@ -31,11 +31,11 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
     """
     Call an LLM with the given prompt and return the response.
     The LLM provider is determined by the LLM_PROVIDER environment variable.
-    If not set, it falls back to the provider specified in code.
+    If not set, it falls back to litellm (our custom proxy).
     """
     # Check and truncate prompt if too long
     prompt = _ensure_prompt_fits_context(prompt)
-    
+
     # Log the prompt
     logger.info(f"PROMPT: {prompt[:500]}..." if len(prompt) > 500 else f"PROMPT: {prompt}")
 
@@ -46,8 +46,8 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
             return response_from_cache
 
     # Get the LLM provider from environment or shared dictionary
-    provider = os.getenv("LLM_PROVIDER", "gemini").lower()
-    
+    # Default to litellm (our custom proxy at https://litellm.genr8ive.ai/v1)
+    provider = os.getenv("LLM_PROVIDER", "litellm").lower()
     # Call the appropriate LLM based on provider
     try:
         if provider == "gemini":
@@ -58,20 +58,22 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
             response = _call_anthropic(prompt)
         elif provider == "openrouter":
             response = _call_openrouter(prompt)
+        elif provider == "litellm":
+            response = _call_litellm(prompt)
         else:
-            # Default to Gemini if unknown provider
-            logger.warning(f"Unknown LLM provider: {provider}. Falling back to Gemini.")
-            response = _call_gemini(prompt)
-        
+            # Default to LiteLLM if unknown provider
+            logger.warning(f"Unknown LLM provider: {provider}. Falling back to LiteLLM.")
+            response = _call_litellm(prompt)
+
         # Cache the response if caching is enabled
         if use_cache:
             _save_to_cache(prompt, response)
-        
+
         # Log the response
         logger.info(f"RESPONSE: {response}")
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(f"Error calling LLM: {e}")
         raise
@@ -81,7 +83,7 @@ def _call_gemini(prompt: str) -> str:
     """Call Google Gemini API"""
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY")))
     response = client.models.generate_content(
-        model="google/gemini-2.5-flash", contents=prompt
+        model="gemini-3-flash-preview", contents=prompt
     )
     return response.text
 
@@ -89,7 +91,7 @@ def _call_gemini(prompt: str) -> str:
 def _call_openai(prompt: str) -> str:
     """Call OpenAI API"""
     from openai import OpenAI
-    
+
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -101,7 +103,7 @@ def _call_openai(prompt: str) -> str:
 def _call_anthropic(prompt: str) -> str:
     """Call Anthropic Claude API"""
     import anthropic
-    
+
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     response = client.messages.create(
         model="claude-3-haiku-20240307",
@@ -116,24 +118,24 @@ def _call_openrouter(prompt: str) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise ValueError("OPENROUTER_API_KEY not found in environment variables")
-    
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    
+
     data = {
-        "model": os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash"),
+        "model": os.getenv("OPENROUTER_MODEL", "google/gemini-3-flash-preview"),
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7
     }
-    
+
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers=headers,
         json=data
     )
-    
+
     if response.status_code == 400 and "maximum context length" in response.text:
         # Try with middle-out transform as suggested by the error
         data["transforms"] = ["middle-out"]
@@ -143,10 +145,80 @@ def _call_openrouter(prompt: str) -> str:
             headers=headers,
             json=data
         )
-    
+
     if response.status_code != 200:
         raise Exception(f"OpenRouter API error: {response.status_code} - {response.text}")
-    
+
+    return response.json()["choices"][0]["message"]["content"]
+
+
+def _call_litellm(prompt: str) -> str:
+    """Call LiteLLM proxy API"""
+    base_url = os.getenv("LITELLM_BASE_URL", "https://litellm.genr8ive.ai/v1")
+    api_key = os.getenv("LITELLM_API_KEY", "sk-litellm-sai-local")
+    model = os.getenv("LITELLM_MODEL", "gemini-flash")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
+    }
+
+    # Construct endpoint: avoid double /v1 if base_url already ends with /v1
+    if base_url.endswith('/v1'):
+        endpoint = f"{base_url}/chat/completions"
+    else:
+        endpoint = f"{base_url}/v1/chat/completions"
+
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json=data
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"LiteLLM API error: {response.status_code} - {response.text}")
+
+    return response.json()["choices"][0]["message"]["content"]
+
+
+def _call_litellm(prompt: str) -> str:
+    """Call LiteLLM proxy API"""
+    base_url = os.getenv("LITELLM_BASE_URL", "https://litellm.genr8ive.ai/v1")
+    api_key = os.getenv("LITELLM_API_KEY", "sk-litellm-sai-local")
+    model = os.getenv("LITELLM_MODEL", "gemini-flash")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7
+    }
+
+    # Construct endpoint: avoid double /v1 if base_url already ends with /v1
+    if base_url.endswith('/v1'):
+        endpoint = f"{base_url}/chat/completions"
+    else:
+        endpoint = f"{base_url}/v1/chat/completions"
+
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json=data
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"LiteLLM API error: {response.status_code} - {response.text}")
+
     return response.json()["choices"][0]["message"]["content"]
 
 
@@ -171,12 +243,12 @@ def _save_to_cache(prompt: str, response: str):
         if os.path.exists(cache_file):
             with open(cache_file, "r", encoding="utf-8") as f:
                 cache = json.load(f)
-        
+
         cache[prompt] = response
-        
+
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2)
-            
+
     except Exception as e:
         logger.warning(f"Cache write error: {e}")
 
@@ -194,28 +266,28 @@ def _count_tokens(text: str) -> int:
 def _ensure_prompt_fits_context(prompt: str, max_tokens: int = 900000) -> str:
     """Ensure prompt fits within context limits by truncating if necessary"""
     token_count = _count_tokens(prompt)
-    
+
     if token_count <= max_tokens:
         return prompt
-    
+
     logger.warning(f"Prompt too long ({token_count} tokens), truncating to fit {max_tokens} tokens")
-    
+
     # Calculate target character count (rough estimate)
     target_chars = int(max_tokens * 3.5)  # Conservative estimate
-    
+
     if len(prompt) <= target_chars:
         return prompt
-    
+
     # Keep beginning and end of prompt, truncate middle
     keep_start = target_chars // 3
     keep_end = target_chars // 3
-    
+
     truncated_prompt = (
-        prompt[:keep_start] + 
+        prompt[:keep_start] +
         f"\n\n... [CONTENT TRUNCATED - Original length: {len(prompt)} chars, {token_count} tokens] ...\n\n" +
         prompt[-keep_end:]
     )
-    
+
     logger.info(f"Truncated prompt from {len(prompt)} to {len(truncated_prompt)} characters")
     return truncated_prompt
 
@@ -224,15 +296,24 @@ def _ensure_prompt_fits_context(prompt: str, max_tokens: int = 900000) -> str:
 def _call_azure_openai(prompt: str) -> str:
     """Call Azure OpenAI API"""
     from openai import AzureOpenAI
-    
+
     client = AzureOpenAI(
         api_key=os.getenv("AZURE_OPENAI_API_KEY"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
     )
-    
+
     response = client.chat.completions.create(
         model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4"),
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content
+
+
+if __name__ == "__main__":
+    test_prompt = "Hello, how are you?"
+
+    # First call - should hit the API
+    print("Making call...")
+    response1 = call_llm(test_prompt, use_cache=False)
+    print(f"Response: {response1}")
